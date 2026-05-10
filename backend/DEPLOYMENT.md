@@ -94,8 +94,8 @@ git push origin main
   - Upgrade to paid tier for always-on service
 
 - **Cold Start Issues:**
-  - ML models (sentence-transformers ~400MB) will load on first request
-  - Consider implementing model caching in the future
+  - ATS semantic scoring now uses a lightweight fallback path
+  - First request may still be slower if NLTK downloads stopwords on demand
 
 - **File Uploads:**
   - Render has 10GB storage per service
