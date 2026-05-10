@@ -11,6 +11,43 @@ const INDUSTRIES = [
   'Healthcare',
 ]
 
+function getScoreMeta(score) {
+  if (score >= 85) {
+    return {
+      label: 'Excellent Match',
+      subtitle: 'Your resume is strongly aligned with the job description.',
+      accent: 'text-emerald-300',
+      ring: 'from-emerald-400 via-neon-400 to-lime-300',
+      glow: 'shadow-[0_0_40px_rgba(16,185,129,0.25)]',
+    }
+  }
+  if (score >= 70) {
+    return {
+      label: 'Strong Match',
+      subtitle: 'Solid fit with a few keyword and formatting opportunities.',
+      accent: 'text-neon-200',
+      ring: 'from-neon-500 via-emerald-300 to-teal-300',
+      glow: 'shadow-[0_0_40px_rgba(34,197,94,0.18)]',
+    }
+  }
+  if (score >= 55) {
+    return {
+      label: 'Moderate Match',
+      subtitle: 'You are close, but the resume needs sharper keyword alignment.',
+      accent: 'text-amber-200',
+      ring: 'from-amber-400 via-yellow-300 to-emerald-300',
+      glow: 'shadow-[0_0_40px_rgba(251,191,36,0.16)]',
+    }
+  }
+  return {
+    label: 'Needs Improvement',
+    subtitle: 'The resume should be tailored more closely to this role.',
+    accent: 'text-rose-200',
+    ring: 'from-rose-400 via-orange-300 to-amber-300',
+    glow: 'shadow-[0_0_40px_rgba(244,63,94,0.14)]',
+  }
+}
+
 function escapeRegExp(string) {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
@@ -24,6 +61,7 @@ function AtsScore() {
   const [result, setResult] = useState(null)
   const [resumePreview, setResumePreview] = useState('')
   const resumeRef = useRef(null)
+  const resultRef = useRef(null)
   const scrollIntervalRef = useRef(null)
   const fileInputRef = useRef(null)
   const [modal, setModal] = useState({ open: false, title: '', message: '' })
@@ -36,6 +74,12 @@ function AtsScore() {
       }
     }
   }, [loading])
+
+  useEffect(() => {
+    if (resultRef.current) {
+      resultRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [result])
 
   function startAutoScroll() {
     const el = resumeRef.current
@@ -96,6 +140,7 @@ function AtsScore() {
   }
 
   const scannerVisible = loading
+  const scoreMeta = getScoreMeta(Number(result?.ats_score || 0))
 
   return (
     <div className="min-h-screen px-5 py-14">
@@ -194,45 +239,128 @@ function AtsScore() {
                     </div>
                   )}
                 </div>
-
-                {result && (
-                  <div className="mt-4 grid gap-2">
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm text-emerald-100/80">ATS Score</div>
-                      <div className="text-2xl font-semibold text-neon-200">{result.ats_score}</div>
-                    </div>
-
-                    <div className="text-sm text-emerald-100/70">Keyword match: {result.keyword_score ?? '—'}%</div>
-                    <div className="text-sm text-emerald-100/70">Semantic similarity: {result.semantic_score ?? '—'}%</div>
-
-                    <div className="mt-2">
-                      <div className="text-sm text-emerald-100/80">Matched Keywords</div>
-                      <div className="mt-1 flex flex-wrap gap-2">
-                        {(result.matched_keywords || []).slice(0, 30).map((k) => (
-                          <div key={k} className="rounded-full bg-neon-500/20 px-3 py-1 text-xs text-neon-100">{k}</div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="mt-2">
-                      <div className="text-sm text-emerald-100/80">Missing Keywords</div>
-                      <div className="mt-1 flex flex-wrap gap-2">
-                        {(result.missing_keywords || []).slice(0, 30).map((k) => (
-                          <div key={k} className="rounded-full bg-emerald-800/40 px-3 py-1 text-xs text-emerald-100">{k}</div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {result.formatting_issues && result.formatting_issues.length > 0 && (
-                      <div className="mt-2 text-sm text-amber-200">
-                        Formatting issues: {result.formatting_issues.join(', ')}
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
             </div>
           </form>
+
+          {result && (
+            <motion.div
+              ref={resultRef}
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45 }}
+              className={`mt-6 overflow-hidden rounded-3xl border border-neon-500/15 bg-gradient-to-br from-emerald-950/95 via-emerald-900/75 to-black/60 p-5 md:p-7 ${scoreMeta.glow}`}
+            >
+              <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                <div className="max-w-2xl">
+                  <div className="inline-flex items-center rounded-full border border-neon-500/20 bg-neon-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.28em] text-neon-100">
+                    ATS Report
+                  </div>
+                  <h3 className="mt-3 font-display text-2xl font-semibold text-emerald-50 md:text-3xl">
+                    {scoreMeta.label}
+                  </h3>
+                  <p className="mt-2 max-w-xl text-sm leading-6 text-emerald-100/70 md:text-base">
+                    {scoreMeta.subtitle}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-5">
+                  <div
+                    className="relative flex h-32 w-32 items-center justify-center rounded-full p-1 md:h-40 md:w-40"
+                    style={{
+                      background: `conic-gradient(from 180deg, rgba(16,185,129,0.95) 0deg, rgba(16,185,129,0.95) ${Math.min(360, (Number(result.ats_score || 0) / 100) * 360)}deg, rgba(16,185,129,0.12) ${Math.min(360, (Number(result.ats_score || 0) / 100) * 360)}deg, rgba(16,185,129,0.12) 360deg)`,
+                    }}
+                  >
+                    <div className="flex h-full w-full items-center justify-center rounded-full border border-neon-500/15 bg-emerald-950/95 text-center shadow-inner shadow-black/30">
+                      <div>
+                        <div className={`font-display text-5xl font-semibold md:text-6xl ${scoreMeta.accent}`}>
+                          {Math.round(Number(result.ats_score || 0))}
+                        </div>
+                        <div className="mt-1 text-[11px] uppercase tracking-[0.3em] text-emerald-100/55">
+                          ATS Score
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="hidden max-w-xs lg:block">
+                    <div className="text-sm font-medium text-emerald-50">Quick verdict</div>
+                    <div className="mt-1 text-sm leading-6 text-emerald-100/65">
+                      Keyword match {result.keyword_score ?? '—'}% · Semantic similarity {result.semantic_score ?? '—'}%
+                    </div>
+                    <div className="mt-2 text-sm leading-6 text-emerald-100/65">
+                      Benchmarked for <span className="text-neon-100">{industry}</span> roles.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 grid gap-3 md:grid-cols-3">
+                {[
+                  { label: 'Keyword Match', value: `${result.keyword_score ?? '—'}%` },
+                  { label: 'Semantic Similarity', value: `${result.semantic_score ?? '—'}%` },
+                  { label: 'Skill Coverage', value: `${result.skill_score ?? '—'}%` },
+                ].map((item) => (
+                  <div key={item.label} className="rounded-2xl border border-neon-500/10 bg-emerald-950/40 px-4 py-4">
+                    <div className="text-xs uppercase tracking-[0.24em] text-emerald-100/45">{item.label}</div>
+                    <div className="mt-2 font-display text-2xl text-emerald-50">{item.value}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-6 grid gap-4 lg:grid-cols-2">
+                <div className="rounded-2xl border border-neon-500/10 bg-black/20 p-4">
+                  <div className="text-sm font-medium text-emerald-50">Matched Keywords</div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {(result.matched_keywords || []).slice(0, 24).map((k) => (
+                      <span key={k} className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs text-emerald-100">
+                        {k}
+                      </span>
+                    ))}
+                    {(!result.matched_keywords || result.matched_keywords.length === 0) && (
+                      <span className="text-sm text-emerald-100/55">No strong matches detected yet.</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-neon-500/10 bg-black/20 p-4">
+                  <div className="text-sm font-medium text-emerald-50">Missing Keywords</div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {(result.missing_keywords || []).slice(0, 24).map((k) => (
+                      <span key={k} className="rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1 text-xs text-amber-100">
+                        {k}
+                      </span>
+                    ))}
+                    {(!result.missing_keywords || result.missing_keywords.length === 0) && (
+                      <span className="text-sm text-emerald-100/55">Great keyword coverage across the JD.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                <div className="rounded-2xl border border-neon-500/10 bg-emerald-950/35 p-4">
+                  <div className="text-sm font-medium text-emerald-50">Formatting Review</div>
+                  <div className="mt-2 text-sm leading-6 text-emerald-100/70">
+                    {result.formatting_issues && result.formatting_issues.length > 0
+                      ? result.formatting_issues.join(' · ')
+                      : 'No major formatting concerns detected.'}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-neon-500/10 bg-emerald-950/35 p-4">
+                  <div className="text-sm font-medium text-emerald-50">Recommended Next Step</div>
+                  <div className="mt-2 text-sm leading-6 text-emerald-100/70">
+                    {Number(result.ats_score || 0) >= 80
+                      ? 'Polish the top section with stronger impact metrics and keep this version as a high-confidence submission.'
+                      : Number(result.ats_score || 0) >= 60
+                        ? 'Add missing keywords naturally, strengthen role-specific bullets, and re-run the scan.'
+                        : 'Tailor the resume to the JD more closely and remove layout elements that may reduce ATS readability.'}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
 
           <style>{`
             @keyframes scanMove { 0% { transform: translateY(-100%); } 100% { transform: translateY(100%); } }
