@@ -20,11 +20,11 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Install pip requirements
-COPY backend/requirements.txt ./requirements.txt
+COPY requirements.txt ./requirements.txt
 RUN python -m pip install --upgrade pip setuptools wheel && python -m pip install -r requirements.txt
 
 # Copy application code
-COPY backend/ /app/
+COPY . /app/
 
 EXPOSE 5000
 
