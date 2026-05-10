@@ -535,11 +535,15 @@ def ats_score():
         jd_text = ""
         resume_source = "text"
         jd_source = "text"
+        job_title = ""
+        industry = ""
 
         if request.is_json:
             payload = request.get_json(silent=True) or {}
             resume_text = payload.get("resume_text", "") or ""
             jd_text = payload.get("jd_text", "") or payload.get("job_description", "") or ""
+            job_title = payload.get("job_title", "") or ""
+            industry = payload.get("industry", "") or ""
         else:
             form = request.form or {}
             resume_text = form.get("resume_text", "") or ""
@@ -567,6 +571,13 @@ def ats_score():
             if jd_text and jd_source == "text":
                 jd_source = "text"
 
+        # Accept job title and industry from form fields
+        try:
+            job_title = job_title or (request.form.get("job_title") or "")
+            industry = industry or (request.form.get("industry") or "")
+        except Exception:
+            pass
+
         if not str(resume_text).strip():
             logger.warning("ATS score request missing resume")
             return _error("No resume provided. Send resume_text or resume_pdf.")
@@ -574,9 +585,63 @@ def ats_score():
             logger.warning("ATS score request missing job description")
             return _error("No job description provided. Send jd_text / job_description or jd_pdf.")
 
-        result = calculate_advanced_ats(resume_text, jd_text, resume_source, jd_source)
-        logger.info(f"ATS score calculated: {result.get('ats_score')}")
-        return jsonify(result)
+        # Compute a local baseline result
+        local_result = calculate_advanced_ats(resume_text, jd_text, resume_source, jd_source)
+
+        # Attempt to call Gemini to get a JSON-formatted ATS scoring breakdown.
+        # If the AI call fails or returns invalid JSON, fall back to local result.
+        try:
+            prompt = (
+                "You are an expert Applicant Tracking System (ATS) scoring engine. "
+                "Given the JOB_TITLE, INDUSTRY, JOB_DESCRIPTION and RESUME_TEXT, "
+                "return a single JSON object (no extra text) with the following keys:\n"
+                "- score: integer 0-100 representing the ATS match score\n"
+                "- matched_keywords: array of strings (keywords found in resume)\n"
+                "- missing_keywords: array of strings (keywords present in JD but missing in resume)\n"
+                "- formatting_issues: array of strings describing likely formatting problems (e.g. 'two-column layout', 'images', 'tables', 'unreadable fonts')\n\n"
+                f"JOB_TITLE: {job_title}\n"
+                f"INDUSTRY: {industry}\n"
+                "JOB_DESCRIPTION:\n" + jd_text + "\n\n"
+                "RESUME_TEXT:\n" + resume_text + "\n\n"
+                "When listing keywords, prefer single-word or short phrase skills like 'react', 'node', 'project management'. "
+                "Output only valid JSON."
+            )
+
+            gemini_raw = _gemini_generate_text(prompt)
+            gemini_raw = gemini_raw.strip()
+            # Try to extract JSON even if the model adds backticks or triple quotes
+            json_start = gemini_raw.find('{')
+            json_text = gemini_raw if json_start == 0 else gemini_raw[json_start:]
+            parsed = json.loads(json_text)
+
+            # Build final result merging local and gemini outputs
+            final = dict(local_result)
+            if isinstance(parsed.get('score'), (int, float)):
+                final['ats_score'] = round(float(parsed.get('score')), 2)
+            if isinstance(parsed.get('matched_keywords'), list):
+                final['matched_keywords'] = [str(x) for x in parsed.get('matched_keywords')]
+            if isinstance(parsed.get('missing_keywords'), list):
+                final['missing_keywords'] = [str(x) for x in parsed.get('missing_keywords')]
+            # formatting_issues is model-provided; include as-is if present
+            if isinstance(parsed.get('formatting_issues'), list):
+                final['formatting_issues'] = [str(x) for x in parsed.get('formatting_issues')]
+
+            # Include a short preview of the resume text for frontend display
+            try:
+                final['resume_text_preview'] = (resume_text or "")[:4000]
+            except Exception:
+                final['resume_text_preview'] = ""
+            logger.info(f"ATS score (Gemini): {final.get('ats_score')}")
+            return jsonify(final)
+        except Exception as exc:
+            logger.warning(f"Gemini ATS fallback: {exc}")
+
+        try:
+            local_result['resume_text_preview'] = (resume_text or "")[:4000]
+        except Exception:
+            local_result['resume_text_preview'] = ""
+        logger.info(f"ATS score calculated (local): {local_result.get('ats_score')}")
+        return jsonify(local_result)
     except Exception as exc:
         logger.error(f"ATS score error: {str(exc)}")
         return _error(str(exc), 500)
