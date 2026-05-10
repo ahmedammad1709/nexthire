@@ -3,18 +3,10 @@ FROM python:3.11-slim
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# System deps for building wheels and WeasyPrint
+# Minimal system deps: only what's needed for building wheels
 RUN apt-get update && apt-get install -y \
     build-essential \
     gcc \
-    libcairo2 \
-    libpango-1.0-0 \
-    libgdk-pixbuf2.0-0 \
-    libffi-dev \
-    libgirepository1.0-dev \
-    fonts-dejavu-core \
-    wget \
-    ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
