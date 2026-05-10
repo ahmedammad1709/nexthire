@@ -312,17 +312,7 @@ def _semantic_similarity_score(resume_text: str, jd_text: str) -> float:
     except Exception:
         pass
 
-    try:
-        from sklearn.feature_extraction.text import TfidfVectorizer
-        from sklearn.metrics.pairwise import cosine_similarity
-
-        vec = TfidfVectorizer(stop_words="english")
-        mat = vec.fit_transform([resume_text, jd_text])
-        sim = cosine_similarity(mat[0:1], mat[1:2])[0][0]
-        return max(0.0, min(1.0, float(sim))) * 100
-    except Exception:
-        pass
-
+    # Fallback to keyword-based similarity if sentence-transformers fails
     stopwords_set = _get_stopwords()
     resume_keywords = _extract_keywords(_tokenize(resume_text, stopwords_set))
     jd_keywords = _extract_keywords(_tokenize(jd_text, stopwords_set))
